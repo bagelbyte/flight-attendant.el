@@ -1,8 +1,13 @@
-;;; emacs-copilot-rpc.el --- Minor mode to provide Github Copilot support -*- lexical-binding: t; -*-
+;;; flight-attendant-rpc.el --- Minor mode to provide Github Copilot support -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2021
+;; Author: cryptobadger <https://github.com/cryptobadger>
+;; Maintainer: cryptobadger
+;; Created: December 02, 2021
+;; Modified: December 02, 2021
+;; Version: 0.0.1
 ;; Keywords: abbrev bib c calendar comm convenience data docs emulations extensions faces files frames games hardware help hypermedia i18n internal languages lisp local maint mail matching mouse multimedia news outlines processes terminals tex tools unix vc wp
-;; Homepage: https://github.com/wintermute/emacs-copilot
+;; Homepage: https://github.com/cryptobadger/flight-attendant.el
 ;; Package-Requires: ((emacs "24.3"))
 ;;
 ;; This file is not part of GNU Emacs.
@@ -17,21 +22,21 @@
 
 (require 'json)
 
-(message "emacs-copilot-rpc.el loaded")
-(defvar ec-libroot (file-name-directory (buffer-file-name))
+(message "flight-attendant-rpc.el loaded")
+(defvar fa-libroot (file-name-directory (buffer-file-name))
   "Probably only interim. do not really know why this is here.")
 (defvar gh-token nil)
 (defvar gh-ratelimit-remaining nil)
 (defvar gh-ratelimit-reset nil)
 (defvar gh-token-expires nil)
-(defcustom ec-copilot-path (concat ec-libroot "copilot/dist/agent.js")
+(defcustom fa-copilot-path (concat fa-libroot "copilot/dist/agent.js")
   "The full path to the copilot executable 'agent.js'."
   :group 'ec)
 
-(defcustom ec-oauth-token (cdr (caddar (json-read-file "~/.config/github-copilot/hosts.json")))
+(defcustom fa-oauth-token (cdr (caddar (json-read-file "~/.config/github-copilot/hosts.json")))
   "The github oauth token. Usually found in ~/.config/github-copilot/hosts.json."
   :group 'ec)
-(defcustom ec-rpc-maximum-buffer-age (* 5 60)
+(defcustom fa-rpc-maximum-buffer-age (* 5 60)
   "Seconds after which Ec automatically closes an unused RPC buffer.
 Ec creates RPC buffers over time, depending on python interpreters
 and the project root. When there are many projects being worked on,
@@ -43,7 +48,7 @@ Setting this variable to nil will disable the behavior."
                  integer)
   :group 'ec)
 
-(defcustom ec-rpc-large-buffer-size 4096
+(defcustom fa-rpc-large-buffer-size 4096
   "Size for a source buffer up to which it will be sent directly.
 The Ec RPC protocol uses JSON as the serialization format.
 Large buffers take a long time to encode, so Ec can transmit
@@ -53,7 +58,7 @@ it is sent via a temporary file."
   :safe #'integerp
   :group 'ec)
 
-(defcustom ec-rpc-ignored-buffer-size 102400
+(defcustom fa-rpc-ignored-buffer-size 102400
   "Size for a source buffer over which Ec completion will not work.
 To provide completion, Ec's backends have to parse the whole
 file every time. For very large files, this is slow, and can make
@@ -63,7 +68,7 @@ this to prevent this from happening."
   :safe #'integerp
   :group 'ec)
 
-(defcustom ec-rpc-node-command (executable-find "node")
+(defcustom fa-rpc-node-command (executable-find "node")
   "The Python interpreter for the RPC backend.
 This should NOT be an interactive shell like ipython or jupyter.
 As the RPC should be independent of any virtual environment, Ec
@@ -73,13 +78,13 @@ for example), set this to the full interpreter path."
   ;; Make sure there is no obsolete rpc running
   :set (lambda (var val)                ;
          (set-default var val)
-         (when (and (fboundp 'ec-rpc-restart)
-                    (not (autoloadp #'ec-rpc-restart)))
-           (ec-rpc-restart)))
+         (when (and (fboundp 'fa-rpc-restart)
+                    (not (autoloadp #'fa-rpc-restart)))
+           (fa-rpc-restart)))
   :group 'ec)
 
 
-(defcustom ec-rpc-timeout 1
+(defcustom fa-rpc-timeout 1
   "Number of seconds to wait for a response when blocking.
 When Ec blocks Emacs to wait for a response from the RPC
 process, it will assume it won't come or wait too long after this
@@ -93,7 +98,7 @@ A setting of nil means to block indefinitely."
               (null val)))
   :group 'ec)
 
-(defcustom ec-rpc-error-timeout 30
+(defcustom fa-rpc-error-timeout 30
   "Minimum number of seconds between error popups.
 When Ec encounters an error in the backend, it will display a
 lengthy description of the problem for a bug report. This hangs
@@ -104,47 +109,47 @@ message again within this amount of seconds."
   :type 'integer
   :group 'ec)
 
-(defvar ec-rpc--call-id 0
-  "Call id of the last call to `ec-rpc`.
+(defvar fa-rpc--call-id 0
+  "Call id of the last call to `fa-rpc`.
 Used to associate responses to callbacks.")
-(make-variable-buffer-local 'ec-rpc--call-id)
+(make-variable-buffer-local 'fa-rpc--call-id)
 
-(defvar ec-rpc--buffer-p nil
-  "Non-nil if the current buffer is an ec-rpc buffer.")
-(make-variable-buffer-local 'ec-rpc--buffer-p)
+(defvar fa-rpc--buffer-p nil
+  "Non-nil if the current buffer is an fa-rpc buffer.")
+(make-variable-buffer-local 'fa-rpc--buffer-p)
 
-(defvar ec-rpc--buffer nil
-  "The ec-rpc buffer associated with this buffer.")
-(make-variable-buffer-local 'ec-rpc--buffer)
+(defvar fa-rpc--buffer nil
+  "The fa-rpc buffer associated with this buffer.")
+(make-variable-buffer-local 'fa-rpc--buffer)
 
-(defvar ec-rpc--backend-library-root nil
+(defvar fa-rpc--backend-library-root nil
   "The project root used by this backend.")
-(make-variable-buffer-local 'ec-rpc--backend-library-root)
+(make-variable-buffer-local 'fa-rpc--backend-library-root)
 
-(defvar ec-rpc--backend-callbacks nil
+(defvar fa-rpc--backend-callbacks nil
   "The callbacks registered for calls to the current backend.
 This maps call IDs to functions.")
-(make-variable-buffer-local 'ec-rpc--backend-callbacks)
+(make-variable-buffer-local 'fa-rpc--backend-callbacks)
 
-(defvar ec-rpc--last-call nil
+(defvar fa-rpc--last-call nil
   "The time of the last RPC call issued for this backend.")
-(make-variable-buffer-local 'ec-rpc--last-call)
+(make-variable-buffer-local 'fa-rpc--last-call)
 
-(defvar ec-rpc--last-error-popup nil
+(defvar fa-rpc--last-error-popup nil
   "The last time an error popup happened.")
 
-(defvar ec-rpc--jedi-available nil
+(defvar fa-rpc--jedi-available nil
   "Whether jedi is available or not.")
 
 
-(defmacro ec-insert--popup (buffer-name &rest body)
+(defmacro fa-insert--popup (buffer-name &rest body)
   "Pop up a help buffer named BUFFER-NAME and execute BODY in it."
   (declare (indent 1))
   `(with-help-window ,buffer-name
      (with-current-buffer standard-output
        ,@body)))
 
-(defun ec-rpc--default-error-callback (error-object)
+(defun fa-rpc--default-error-callback (error-object)
   "Display an error from the RPC backend."
   ;; We actually might get an (error "foo") thing here.
   (if (and (consp error-object)
@@ -162,18 +167,18 @@ This maps call IDs to functions.")
         (error "Ec error: %s" message))
        ((= code -3001)
         (error "Ec error - Offline?: %s" message))
-       ((and ec-rpc-error-timeout
-             ec-rpc--last-error-popup
+       ((and fa-rpc-error-timeout
+             fa-rpc--last-error-popup
              (<= (float-time)
-                 (+ ec-rpc--last-error-popup
-                    ec-rpc-error-timeout)))
-        (message "Ec error popup ignored, see `ec-rpc-error-timeout': %s"
+                 (+ fa-rpc--last-error-popup
+                    fa-rpc-error-timeout)))
+        (message "Ec error popup ignored, see `fa-rpc-error-timeout': %s"
                  message))
        (t
         (let ((config nil))
-          (ec-insert--popup "*Ec Error*"
-            (ec-insert--header "Ec Error")
-            (ec-insert--para
+          (fa-insert--popup "*Ec Error*"
+            (fa-insert--header "Ec Error")
+            (fa-insert--para
              "The backend encountered an unexpected error. This indicates "
              "a bug in Ec. Please open a bug report with the data below "
              "in the Ec bug tracker:")
@@ -187,11 +192,11 @@ This maps call IDs to functions.")
             (insert "\n"
                     "\n"
                     "```\n")
-            (ec-insert--header "Error Message")
+            (fa-insert--header "Error Message")
             (insert message "\n\n"))
-          (setq ec-rpc--last-error-popup (float-time))))))))
+          (setq fa-rpc--last-error-popup (float-time))))))))
 
-(defun ec-insert--para (&rest messages)
+(defun fa-insert--para (&rest messages)
   "Insert MESSAGES, a list of strings, and then fill it."
   (let ((start (point)))
     (mapc (lambda (obj)
@@ -200,7 +205,7 @@ This maps call IDs to functions.")
               (insert (format "%s" obj))))
           messages)
     (fill-region start (point))))
-(defun ec-insert--header (&rest text)
+(defun fa-insert--header (&rest text)
   "Insert TEXT has a header for a buffer."
   (insert (propertize (mapconcat #'(lambda (x) x)
                                  text
@@ -208,102 +213,102 @@ This maps call IDs to functions.")
                       'face 'header-line)
           "\n"
           "\n"))
-(defun ec-rpc--buffer-contents ()
+(defun fa-rpc--buffer-contents ()
   "Return the contents of the current buffer.
 This returns either a string, or a file object for the RPC
 protocol if the buffer is larger than
-`ec-rpc-large-buffer-size'."
-  (if (< (buffer-size) ec-rpc-large-buffer-size)
+`fa-rpc-large-buffer-size'."
+  (if (< (buffer-size) fa-rpc-large-buffer-size)
       (buffer-string)
-    (let ((file-name (make-temp-file "ec-rpc-"))
+    (let ((file-name (make-temp-file "fa-rpc-"))
           (coding-system-for-write 'utf-8))
       (write-region nil nil file-name nil :nomessage)
       `((filename . ,file-name)
         (delete_after_use . t)))))
 
-(defun ec-rpc (method params &optional success error)
+(defun fa-rpc (method params &optional success error)
   "Call METHOD with PARAMS in the backend.
 If SUCCESS and optionally ERROR is given, return immediately and
 call those when a result is available. Otherwise, wait for a
 result and return that."
   (unless error
-    (setq error #'ec-rpc--default-error-callback))
+    (setq error #'fa-rpc--default-error-callback))
   (if success
-      (ec-rpc--call method params success error)
-    (ec-rpc--call-blocking method params)))
+      (fa-rpc--call method params success error)
+    (fa-rpc--call-blocking method params)))
 
-(defun ec-rpc--call-blocking (method-name params)
+(defun fa-rpc--call-blocking (method-name params)
   "Call METHOD-NAME with PARAMS in the current RPC backend.
 Returns the result, blocking until this arrived."
   (let* ((result-arrived nil)
          (error-occured nil)
          (result-value nil)
          (error-object nil)
-         (promise (ec-rpc--call method-name params
+         (promise (fa-rpc--call method-name params
                                 (lambda (result)
                                   (setq result-value result
                                         result-arrived t))
                                 (lambda (err)
                                   (setq error-object err
                                         error-occured t)))))
-    (ec-promise-wait promise ec-rpc-timeout)
+    (fa-promise-wait promise fa-rpc-timeout)
     (cond
      (error-occured
-      (ec-rpc--default-error-callback error-object))
+      (fa-rpc--default-error-callback error-object))
      (result-arrived
       result-value)
      (t
       (error "Timeout during RPC call %s from backend"
              method-name)))))
 
-(defun ec-rpc--call (method-name params success error)
+(defun fa-rpc--call (method-name params success error)
   "Call METHOD-NAME with PARAMS in the current RPC backend.
 When a result is available, SUCCESS will be called with that
 value as its sole argument. If an error occurs, ERROR will be
 called with the error list.
 Returns a PROMISE object."
-  (let ((promise (ec-promise success error)))
-    (with-current-buffer (ec-rpc--get-rpc-buffer)
-      (setq ec-rpc--call-id (1+ ec-rpc--call-id)
-            ec-rpc--last-call (float-time))
-      (ec-rpc--register-callback ec-rpc--call-id promise)
+  (let ((promise (fa-promise success error)))
+    (with-current-buffer (fa-rpc--get-rpc-buffer)
+      (setq fa-rpc--call-id (1+ fa-rpc--call-id)
+            fa-rpc--last-call (float-time))
+      (fa-rpc--register-callback fa-rpc--call-id promise)
       (process-send-string
        (get-buffer-process (current-buffer))
        (let ((json-encoding-pretty-print nil))  ;; Link to bug https://github.com/jorgenschaefer/ec/issues/1521
          (concat (json-encode `((jsonrpc . "2.0")
-                                (id . ,ec-rpc--call-id)
+                                (id . ,fa-rpc--call-id)
                                 (method . ,method-name)
                                 (params . ,params)))
                  "\n"))))
     promise))
 
-(defun ec-rpc--register-callback (call-id promise)
+(defun fa-rpc--register-callback (call-id promise)
   "Register for PROMISE to be called when CALL-ID returns.
-Must be called in an ec-rpc buffer."
-  (unless ec-rpc--buffer-p
+Must be called in an fa-rpc buffer."
+  (unless fa-rpc--buffer-p
     (error "Must be called in RPC buffer"))
-  (unless ec-rpc--backend-callbacks
-    (setq ec-rpc--backend-callbacks (make-hash-table :test #'equal)))
-  (puthash call-id promise ec-rpc--backend-callbacks))
+  (unless fa-rpc--backend-callbacks
+    (setq fa-rpc--backend-callbacks (make-hash-table :test #'equal)))
+  (puthash call-id promise fa-rpc--backend-callbacks))
 
-(defun ec-rpc--get-rpc-buffer ()
+(defun fa-rpc--get-rpc-buffer ()
   "Return the RPC buffer associated with the current buffer,
 creating one if necessary."
-  (unless (ec-rpc--process-buffer-p ec-rpc--buffer)
-    (setq ec-rpc--buffer
-          (or (ec-rpc--find-buffer)
-              (ec-rpc--open))))
-  ec-rpc--buffer)
+  (unless (fa-rpc--process-buffer-p fa-rpc--buffer)
+    (setq fa-rpc--buffer
+          (or (fa-rpc--find-buffer)
+              (fa-rpc--open))))
+  fa-rpc--buffer)
 
-(defun ec-rpc--process-buffer-p (buffer)
-  "Return non-nil when BUFFER is a live ec-rpc process buffer.
-If BUFFER is a buffer for an ec-rpc process, but the process
+(defun fa-rpc--process-buffer-p (buffer)
+  "Return non-nil when BUFFER is a live fa-rpc process buffer.
+If BUFFER is a buffer for an fa-rpc process, but the process
 died, this will kill the process and buffer."
   (cond
    ((or (not buffer)
         (not (buffer-live-p buffer)))
     nil)
-   ((not (buffer-local-value 'ec-rpc--buffer-p buffer))
+   ((not (buffer-local-value 'fa-rpc--buffer-p buffer))
     nil)
    ((and (get-buffer-process buffer)
          (process-live-p (get-buffer-process buffer)))
@@ -315,14 +320,14 @@ died, this will kill the process and buffer."
       (kill-buffer buffer))
     nil)))
 
-(defun ec-rpc--cleanup-buffers ()
+(defun fa-rpc--cleanup-buffers ()
   "Close RPC buffers that have not been used in five minutes."
-  (when ec-rpc-maximum-buffer-age
+  (when fa-rpc-maximum-buffer-age
     (let ((old (- (float-time)
-                  ec-rpc-maximum-buffer-age)))
+                  fa-rpc-maximum-buffer-age)))
       (dolist (buffer (buffer-list))
-        (when (and (ec-rpc--process-buffer-p buffer)
-                   (< (or (buffer-local-value 'ec-rpc--last-call buffer)
+        (when (and (fa-rpc--process-buffer-p buffer)
+                   (< (or (buffer-local-value 'fa-rpc--last-call buffer)
                           old)
                       old))
           (ignore-errors
@@ -330,85 +335,85 @@ died, this will kill the process and buffer."
           (ignore-errors
             (kill-buffer buffer)))))))
 
-(defun ec-rpc--find-buffer ()
+(defun fa-rpc--find-buffer ()
   "Return an existing RPC buffer for this project root and command."
   (catch 'return
-    (let ((node-cmd ec-rpc-node-command))
+    (let ((node-cmd fa-rpc-node-command))
       (dolist (buf (buffer-list))
-        (when (and (ec-rpc--process-buffer-p buf))
+        (when (and (fa-rpc--process-buffer-p buf))
           (throw 'return buf))))
     nil))
 
-(defun ec-config-error (&optional fmt &rest args)
+(defun fa-config-error (&optional fmt &rest args)
   "Note a configuration problem.
 
 FMT is the formating string.
 
 This will show a message in the minibuffer that tells the user to
-use \\[ec-config]."
+use \\[fa-config]."
   (let ((msg (if fmt
                  (apply #'format fmt args)
                "Ec is not properly configured")))
-    (error "%s; use M-x ec-config to configure it" msg)))
+    (error "%s; use M-x fa-config to configure it" msg)))
 
-(defun ec-rpc--open ()
+(defun fa-rpc--open ()
   "Start a new RPC process and return the associated buffer."
-  (ec-rpc--cleanup-buffers)
-  (let* ((node-cmd (executable-find ec-rpc-node-command))
-         (name (format " *ec-rpc [project:%s]*"
-                       ec-libroot))
-         (new-ec-rpc-buffer (generate-new-buffer name))
+  (fa-rpc--cleanup-buffers)
+  (let* ((node-cmd (executable-find fa-rpc-node-command))
+         (name (format " *fa-rpc [project:%s]*"
+                       fa-libroot))
+         (new-fa-rpc-buffer (generate-new-buffer name))
          (proc nil))
     (unless node-cmd
-      (error "Can't find Node command, configure `ec-rpc-node-command'"))
-    (with-current-buffer new-ec-rpc-buffer
-      (setq ec-rpc--buffer-p t
-            ec-rpc--buffer (current-buffer)
-            ec-rpc--backend-library-root ec-libroot
+      (error "Can't find Node command, configure `fa-rpc-node-command'"))
+    (with-current-buffer new-fa-rpc-buffer
+      (setq fa-rpc--buffer-p t
+            fa-rpc--buffer (current-buffer)
+            fa-rpc--backend-library-root fa-libroot
             default-directory "/"
             proc (condition-case err
                      (let ((process-connection-type nil))
                        (start-process name
                                       (current-buffer)
-                                      node-cmd ec-copilot-path))
+                                      node-cmd fa-copilot-path))
                    (error
-                    (ec-config-error
+                    (fa-config-error
                      "Ec can't start Python (%s: %s)"
                      (car err) (cadr err)))))
       (set-process-query-on-exit-flag proc nil)
-      (set-process-sentinel proc #'ec-rpc--sentinel)
-      (set-process-filter proc #'ec-rpc--filter)
-      (ec-rpc-init))
+      (set-process-sentinel proc #'fa-rpc--sentinel)
+      (set-process-filter proc #'fa-rpc--filter)
+      (fa-rpc-init))
       ;;  (lambda (result)
       ;;    (message (cdr (assq 'version result))))))
-    new-ec-rpc-buffer))
+    new-fa-rpc-buffer))
 
 
-(defun ec-rpc--region-contents ()
+(defun fa-rpc--region-contents ()
   "Return the selected region as a string."
   (if (use-region-p)
       (buffer-substring (region-beginning) (region-end))))
 
-(defun ec-rpc--disconnect ()
+(defun fa-rpc--disconnect ()
   "Disconnect rpc process from ec buffers."
   (dolist (buf (buffer-list))
     (with-current-buffer buf
-      (when ec-mode
-        (setq ec-rpc--buffer nil)))))
+      (when fa-mode
+        (setq fa-rpc--buffer nil)))))
 
 ;; RPC API functions
 
-(defun ec-rpc-restart ()
+(defun fa-rpc-restart ()
   "Restart all RPC processes."
   (interactive)
   (dolist (buffer (buffer-list))
-    (when (ec-rpc--process-buffer-p buffer)
+    (when (fa-rpc--process-buffer-p buffer)
       (ignore-errors
         (kill-process (get-buffer-process buffer)))
       (ignore-errors
         (kill-buffer buffer)))))
 
-(defun ec-rpc-init (&optional success error)
+(defun fa-rpc-init (&optional success error)
   "Initialize the backend.
 
 This has to be called as the first method, else Ec won't be
@@ -418,14 +423,14 @@ able to respond to other calls.
 +ENVIRONMENT-BINARIES is the path to the python binaries of the environment to work in."
   (message "Starting copilot")
   (message (concat "Github Copilot started - " (cdr (assq 'version
-                                                        (ec-rpc "getVersion"
+                                                        (fa-rpc "getVersion"
                                                     ;; This uses a vector because otherwise, json-encode in
                                                     ;; older Emacsen gets seriously confused, especially when
                                                     ;; backend is nil.
                                                                   (make-hash-table))))))
-  (ec-rpc-get-token))
+  (fa-rpc-get-token))
 '((version . 1.7.4))
-(defun ec-rpc--sentinel (process event)
+(defun fa-rpc--sentinel (process event)
   "The sentinel for the RPC process.
 As process sentinels are only ever called when the process
 terminates, this will call the error handler of all registered
@@ -435,14 +440,14 @@ RPC calls with the event."
     (when (and buffer
                (buffer-live-p buffer))
       (with-current-buffer buffer
-        (when ec-rpc--backend-callbacks
+        (when fa-rpc--backend-callbacks
           (maphash (lambda (_call-id promise)
                      (ignore-errors
-                       (ec-promise-reject promise err)))
-                   ec-rpc--backend-callbacks)
-          (setq ec-rpc--backend-callbacks nil))))))
+                       (fa-promise-reject promise err)))
+                   fa-rpc--backend-callbacks)
+          (setq fa-rpc--backend-callbacks nil))))))
 
-(defun ec-rpc--filter (process output)
+(defun fa-rpc--filter (process output)
   "The filter for the RPC process."
   (let ((buffer (process-buffer process)))
     (when (and buffer
@@ -472,136 +477,136 @@ RPC calls with the event."
             (cond
              (did-read-json
               (delete-region (point-min) line-end)
-              (ec-rpc--handle-json json))
-             ;; ((looking-at "ec-rpc ready\n")
+              (fa-rpc--handle-json json))
+             ;; ((looking-at "fa-rpc ready\n")
              ;;  (replace-match "")
-             ;;  (ec-rpc--check-backend-version "1.1"))
-             ;; ((looking-at "ec-rpc ready (\\([^ ]*\\))\n")
+             ;;  (fa-rpc--check-backend-version "1.1"))
+             ;; ((looking-at "fa-rpc ready (\\([^ ]*\\))\n")
              ;;  (let ((rpc-version (match-string 1)))
              ;;    (replace-match "")
-             ;;    (ec-rpc--check-backend-version rpc-version)))
+             ;;    (fa-rpc--check-backend-version rpc-version)))
              ;; ((looking-at ".*No module named ec\n")
              ;;  (replace-match "")
-             ;;  (ec-config-error "Ec module not found"))
+             ;;  (fa-config-error "Ec module not found"))
              ((looking-at ".*request cancelled")
               (replace-match "")
               (message "Request Cancelled")
-              (ec-clear-overlay))
+              (fa-clear-overlay))
              (t
               (let ((line (buffer-substring (point-min)
                                             line-end)))
                 (delete-region (point-min) line-end)
-                (ec-rpc--handle-unexpected-line line))))))))))
+                (fa-rpc--handle-unexpected-line line))))))))))
 
-(defun ec-rpc--handle-unexpected-line (line)
+(defun fa-rpc--handle-unexpected-line (line)
   "Handle an unexpected line from the backend.
 This is usually an error or backtrace."
   (let ((buf (get-buffer "*Ec Output*")))
     (unless buf
-      (ec-insert--popup "*Ec Output*"
-        (ec-insert--header "Output from Backend")
-        (ec-insert--para
+      (fa-insert--popup "*Ec Output*"
+        (fa-insert--header "Output from Backend")
+        (fa-insert--para
          "There was some unexpected output from the Ec backend. "
          "This is usually not a problem and should usually not be "
          "reported as a bug with Ec. You can safely hide this "
          "buffer and ignore it. You can also see the output below "
          "in case there is an actual problem.\n\n")
-        (ec-insert--header "Output")
+        (fa-insert--header "Output")
         (setq buf (current-buffer))))
     (with-current-buffer buf
       (goto-char (point-max))
       (let ((inhibit-read-only t))
         (insert line)))))
 
-(defun ec-rpc--handle-json (json)
+(defun fa-rpc--handle-json (json)
   "Handle a single JSON object from the RPC backend."
   (let ((call-id (cdr (assq 'id json)))
         (error-object (cdr (assq 'error json)))
         (result (cdr (assq 'result json))))
-    (let ((promise (gethash call-id ec-rpc--backend-callbacks)))
+    (let ((promise (gethash call-id fa-rpc--backend-callbacks)))
       (unless promise
         (error "Received a response for unknown call-id %s" call-id))
-      (remhash call-id ec-rpc--backend-callbacks)
+      (remhash call-id fa-rpc--backend-callbacks)
       (if error-object
-          (ec-promise-reject promise error-object)
-        (ec-promise-resolve promise result)))))
+          (fa-promise-reject promise error-object)
+        (fa-promise-resolve promise result)))))
 
 ;; promises
 ;;
 
-(defvar ec-promise-marker (make-symbol "*ec-promise*")
+(defvar fa-promise-marker (make-symbol "*fa-promise*")
   "An uninterned symbol marking an Ec promise object.")
 
-(defun ec-promise (success &optional error)
+(defun fa-promise (success &optional error)
   "Return a new promise.
 A promise is an object with a success and error callback. If the
-promise is resolved using `ec-promise-resolve', the SUCCESS
+promise is resolved using `fa-promise-resolve', the SUCCESS
 callback is called with the given value. The current buffer is
 restored, too.
-If the promise is rejected using `ec-promise-reject', the ERROR
+If the promise is rejected using `fa-promise-reject', the ERROR
 callback is called. For this function, the current buffer is not
 necessarily restored, as it is also called when the buffer does
 not exist anymore."
-  (vector ec-promise-marker ; 0 id
+  (vector fa-promise-marker ; 0 id
           success             ; 1 success-callback
           error               ; 2 error-callback
           (current-buffer)    ; 3 current-buffer
           nil))                 ; 4 run
 
 
-(defun ec-promise-p (obj)
+(defun fa-promise-p (obj)
   "Return non-nil if OBJ is a promise object."
   (and (vectorp obj)
        (= (length obj) 5)
-       (eq (aref obj 0) ec-promise-marker)))
+       (eq (aref obj 0) fa-promise-marker)))
 
-(defsubst ec-promise-success-callback (promise)
+(defsubst fa-promise-success-callback (promise)
   "Return the success callback for PROMISE."
   (aref promise 1))
 
-(defsubst ec-promise-error-callback (promise)
+(defsubst fa-promise-error-callback (promise)
   "Return the error callback for PROMISE."
   (aref promise 2))
 
-(defsubst ec-promise-buffer (promise)
+(defsubst fa-promise-buffer (promise)
   "Return the buffer for PROMISE."
   (aref promise 3))
 
-(defsubst ec-promise-resolved-p (promise)
+(defsubst fa-promise-resolved-p (promise)
   "Return non-nil if the PROMISE has been resolved or rejected."
   (aref promise 4))
 
-(defsubst ec-promise-set-resolved (promise)
+(defsubst fa-promise-set-resolved (promise)
   "Mark PROMISE as having been resolved."
   (aset promise 4 t))
 
-(defun ec-promise-resolve (promise value)
+(defun fa-promise-resolve (promise value)
   "Resolve PROMISE with VALUE."
-  (unless (ec-promise-resolved-p promise)
+  (unless (fa-promise-resolved-p promise)
     (unwind-protect
-        (let ((success-callback (ec-promise-success-callback promise)))
+        (let ((success-callback (fa-promise-success-callback promise)))
           (when success-callback
             (condition-case err
-                (with-current-buffer (ec-promise-buffer promise)
+                (with-current-buffer (fa-promise-buffer promise)
                   (funcall success-callback value))
               (error
-               (ec-promise-reject promise err)))))
-      (ec-promise-set-resolved promise))))
+               (fa-promise-reject promise err)))))
+      (fa-promise-set-resolved promise))))
 
-(defun ec-promise-reject (promise reason)
+(defun fa-promise-reject (promise reason)
   "Reject PROMISE because of REASON."
-  (unless (ec-promise-resolved-p promise)
+  (unless (fa-promise-resolved-p promise)
     (unwind-protect
-        (let ((error-callback (ec-promise-error-callback promise)))
+        (let ((error-callback (fa-promise-error-callback promise)))
           (when error-callback
-            (if (buffer-live-p (ec-promise-buffer promise))
-                (with-current-buffer (ec-promise-buffer promise)
+            (if (buffer-live-p (fa-promise-buffer promise))
+                (with-current-buffer (fa-promise-buffer promise)
                   (funcall error-callback reason))
               (with-temp-buffer
                 (funcall error-callback reason)))))
-      (ec-promise-set-resolved promise))))
+      (fa-promise-set-resolved promise))))
 
-(defun ec-promise-wait (promise &optional timeout)
+(defun fa-promise-wait (promise &optional timeout)
   "Wait for PROMISE to be resolved, for up to TIMEOUT seconds.
 This will accept process output while waiting.
 This will wait for the current Ec RPC process specifically, as
@@ -611,8 +616,8 @@ See http://debbugs.gnu.org/cgi/bugreport.cgi?bug=17647"
   (let ((end-time (when timeout
                     (time-add (current-time)
                               (seconds-to-time timeout))))
-        (process (get-buffer-process (ec-rpc--get-rpc-buffer))))
-    (while (and (not (ec-promise-resolved-p promise))
+        (process (get-buffer-process (fa-rpc--get-rpc-buffer))))
+    (while (and (not (fa-promise-resolved-p promise))
                 (or (not end-time)
                     (time-less-p (current-time)
                                  end-time)))
@@ -621,13 +626,13 @@ See http://debbugs.gnu.org/cgi/bugreport.cgi?bug=17647"
 
 ;;; Commands
 
-(defun ec-rpc-get-token (&optional success error) ;
+(defun fa-rpc-get-token (&optional success error) ;
   "Call the get_token API function.
 
 Not async because we have no id to keep track of the promise"
-  (let ((result (ec-rpc "httpRequest"
+  (let ((result (fa-rpc "httpRequest"
                        `((:headers
-                          (:Authorization . ,(concat "Bearer " ec-oauth-token)))
+                          (:Authorization . ,(concat "Bearer " fa-oauth-token)))
                          (:url . "https://api.github.com/copilot_internal/token")
                          (:timeout . 30000)))))
       (setq gh-token (cdr (assq 'token (json-read-from-string (cdr (assq 'body result))))))
@@ -635,65 +640,65 @@ Not async because we have no id to keep track of the promise"
       (setq gh-ratelimit-reset (cdr (assq 'x-ratelimit-reset (assq 'headers result))))
       (setq gh-token-expires (cdr (assq 'expires_at (json-read-from-string (cdr (assq 'body result))))))))
 
-(defun ec--get-path ()
+(defun fa--get-path ()
     (or buffer-file-name
         (ignore-errors
           (buffer-file-name
            (buffer-base-buffer)))))
-(defun ec--get-relative-path ()
+(defun fa--get-relative-path ()
     (file-name-nondirectory buffer-file-name))
 
-(defun ec--get-buffer-str ()
+(defun fa--get-buffer-str ()
   (let ((pos))
     (list :line (1- (line-number-at-pos pos t)) ; F!@&#$CKING OFF-BY-ONE
           :character (progn (when pos (goto-char pos))
                             (funcall coglot-current-column-function)))))
 
 
-(defun ec--get-line-no ()
+(defun fa--get-line-no ()
   (1- (line-number-at-pos)))
-(defun ec--get-col-no ()
+(defun fa--get-col-no ()
   (current-column))
-(defun ec--get-buffer-text ()
+(defun fa--get-buffer-text ()
   (buffer-substring-no-properties (point-min) (point-max)))
-(defun ec--get-tab-width ()
+(defun fa--get-tab-width ()
   tab-width)
-(defun ec--get-indent-size ()
+(defun fa--get-indent-size ()
   tab-width)
-(defun ec--get-insert-spaces ()
+(defun fa--get-insert-spaces ()
   t)
 (defvar language-ids '((python-mode . "python")
                        ;; (emacs-lisp-mode . "python")
                        (typescript-mode . "typescript")))
-(defun ec--get-language-id ()
+(defun fa--get-language-id ()
   (cdr (assq major-mode language-ids)))
 
-(defun ec--get-completion-params ()
+(defun fa--get-completion-params ()
   `((:options . ,(make-hash-table))
     (:token . ,gh-token)
-    (:doc . ((:path . ,(ec--get-path))
-             (:relativePath . ,(ec--get-relative-path))
-             (:source . ,(ec--get-buffer-text))
-             (:tabSize . ,(ec--get-tab-width))
-             (:indentSize . ,(ec--get-indent-size))
-             (:languageId . ,(ec--get-language-id))
-             (:insertSpaces . ,(ec--get-insert-spaces))
-             (:position . ((:character . ,(ec--get-col-no))
-                           (:line . ,(ec--get-line-no))))))))
+    (:doc . ((:path . ,(fa--get-path))
+             (:relativePath . ,(fa--get-relative-path))
+             (:source . ,(fa--get-buffer-text))
+             (:tabSize . ,(fa--get-tab-width))
+             (:indentSize . ,(fa--get-indent-size))
+             (:languageId . ,(fa--get-language-id))
+             (:insertSpaces . ,(fa--get-insert-spaces))
+             (:position . ((:character . ,(fa--get-col-no))
+                           (:line . ,(fa--get-line-no))))))))
 
-(defun ec-rpc-request-completion (&optional success error)
+(defun fa-rpc-request-completion (&optional success error)
   "Call the get_calltip API function.
 
 Returns a calltip string for the function call at point."
-  (when (and (< (buffer-size) ec-rpc-ignored-buffer-size)
-             (ec--get-language-id)
+  (when (and (< (buffer-size) fa-rpc-ignored-buffer-size)
+             (fa--get-language-id)
              gh-token)
-    (ec-rpc "getCompletions"
-            (ec--get-completion-params)
+    (fa-rpc "getCompletions"
+            (fa--get-completion-params)
             success
-            (lambda (err) (message err) (setq ec-error err)))))
+            (lambda (err) (message err) (setq fa-error err)))))
 
-(defvar ec-result nil)
-(defvar ec-error nil)
-(provide 'emacs-copilot-rpc)
-;;; emacs-copilot-rpc.el ends here
+(defvar fa-result nil)
+(defvar fa-error nil)
+(provide 'flight-attendant-rpc)
+;;; flight-attendant-rpc.el ends here

@@ -7,7 +7,7 @@ What i did:
 - Find a [[https://github.com/jorgenschaefer/elpy][project]] that leverages the output of an executable in the same way we need it here and without as much overhead as the LSP implementations. (elpy)
 - Implement the necessary calls for authentication and completion requests
 
-For now the integrated minor mode ~ec-mode~ only activates on ~Python~ files but extending it to other languages should be trivial.
+For now the integrated minor mode ~fa-mode~ only activates on ~Python~ files but extending it to other languages should be trivial.
 What needs to be done:
 Find a way to display the suggestions that does not interfere as much with company and probably a dozen other features as the current way.
 
@@ -21,11 +21,11 @@ This software is 100% untested and not even remotely near alpha stage. It will b
 ** Setup Instructions
 You need to have access to the github Copilot program. Since i did not yet implement the "activation" process you need to complete it using another editor, e.g. [[https://github.com/neovim/neovim][nvim]]. After that a ~hosts.json~ should be in your ~config/github-copilot~ folder. (On linux: ~"~/.config/github-copilot/hosts.json"~).
 1. clone this project
-2. clone https://github.com/github/copilot.vim and copy the ~copilot~ directory to the emacs-copilot project folder
+2. clone https://github.com/github/copilot.vim and copy the ~copilot~ directory to the ~flight-attendant.el~ project folder
 3. run
    #+begin_src emacs-lisp
-(load "/path/to/emacs-copilot.el")
-(ec-enable)
+(load "/path/to/flight-attendant.el")
+(fa-enable)
    #+end_src
 ** Roadmap/Todo
 Sorted by urgency.
