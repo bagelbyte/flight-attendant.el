@@ -23,7 +23,8 @@
 (require 'json)
 
 (message "flight-attendant-rpc.el loaded")
-(defvar fa-libroot (file-name-directory (buffer-file-name))
+
+(defvar fa-libroot (file-name-directory (or load-file-name buffer-file-name))
   "Probably only interim. do not really know why this is here.")
 (defvar gh-token nil)
 (defvar gh-ratelimit-remaining nil)

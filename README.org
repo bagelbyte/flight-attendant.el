@@ -24,9 +24,21 @@ You need to have access to the github Copilot program. Since i did not yet imple
 2. clone https://github.com/github/copilot.vim and copy the ~copilot~ directory to the ~flight-attendant.el~ project folder
 3. run
    #+begin_src emacs-lisp
-(load "/path/to/flight-attendant.el")
+(add-to-list 'load-path "/path/to/repo/")
+(load "flight-attendant.el")
 (fa-enable)
    #+end_src
+For friends of copy + paste:
+   #+begin_src bash
+git clone https://github.com/cryptobadger/flight-attendant.el;
+git clone https://github.com/github/copilot.vim;
+cp -r copilot.vim/copilot flight-attendant.el/;
+emacs --eval "(progn (add-to-list 'load-path \"flight-attendant.el/\") (load \"flight-attendant.el\") (fa-enable))"
+   #+end_src
+** Display Completions
+Below is the problem:
+  [[https://github.com/cryptobadger/flight-attendant.el/blob/media/pics/company-bug.png?raw=true]]
+Any ideas how to display the completion candidate(s?) properly is welcome.
 ** Roadmap/Todo
 Sorted by urgency.
 - [ ] fix/find a solution for the question how to display hints
