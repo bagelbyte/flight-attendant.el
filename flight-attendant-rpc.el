@@ -31,14 +31,14 @@
 (defvar gh-token-expires nil)
 (defcustom fa-copilot-path (concat fa-libroot "copilot/dist/agent.js")
   "The full path to the copilot executable 'agent.js'."
-  :group 'ec)
+  :group 'fa)
 
 (defcustom fa-oauth-token (cdr (caddar (json-read-file "~/.config/github-copilot/hosts.json")))
   "The github oauth token. Usually found in ~/.config/github-copilot/hosts.json."
-  :group 'ec)
+  :group 'fa)
 (defcustom fa-rpc-maximum-buffer-age (* 5 60)
-  "Seconds after which Ec automatically closes an unused RPC buffer.
-Ec creates RPC buffers over time, depending on python interpreters
+  "Seconds after which Fa automatically closes an unused RPC buffer.
+Fa creates RPC buffers over time, depending on python interpreters
 and the project root. When there are many projects being worked on,
 these can accumulate. Setting this variable to an integer will close
 buffers and processes when they have not been used for this amount of
@@ -46,32 +46,32 @@ seconds.
 Setting this variable to nil will disable the behavior."
   :type '(choice (const :tag "Never" nil)
                  integer)
-  :group 'ec)
+  :group 'fa)
 
 (defcustom fa-rpc-large-buffer-size 4096
   "Size for a source buffer up to which it will be sent directly.
-The Ec RPC protocol uses JSON as the serialization format.
-Large buffers take a long time to encode, so Ec can transmit
+The Fa RPC protocol uses JSON as the serialization format.
+Large buffers take a long time to encode, so Fa can transmit
 them via temporary files. If a buffer is larger than this value,
 it is sent via a temporary file."
   :type 'integer
   :safe #'integerp
-  :group 'ec)
+  :group 'fa)
 
 (defcustom fa-rpc-ignored-buffer-size 102400
-  "Size for a source buffer over which Ec completion will not work.
-To provide completion, Ec's backends have to parse the whole
+  "Size for a source buffer over which Fa completion will not work.
+To provide completion, Fa's backends have to parse the whole
 file every time. For very large files, this is slow, and can make
-Emacs laggy. Ec will simply not work on buffers larger than
+Emacs laggy. Fa will simply not work on buffers larger than
 this to prevent this from happening."
   :type 'integer
   :safe #'integerp
-  :group 'ec)
+  :group 'fa)
 
 (defcustom fa-rpc-node-command (executable-find "node")
   "The Python interpreter for the RPC backend.
 This should NOT be an interactive shell like ipython or jupyter.
-As the RPC should be independent of any virtual environment, Ec
+As the RPC should be independent of any virtual environment, Fa
 will try to use the system interpreter if it exists. If you wish
 to use a specific python interpreter (from a virtual environment
 for example), set this to the full interpreter path."
@@ -81,12 +81,12 @@ for example), set this to the full interpreter path."
          (when (and (fboundp 'fa-rpc-restart)
                     (not (autoloadp #'fa-rpc-restart)))
            (fa-rpc-restart)))
-  :group 'ec)
+  :group 'fa)
 
 
 (defcustom fa-rpc-timeout 1
   "Number of seconds to wait for a response when blocking.
-When Ec blocks Emacs to wait for a response from the RPC
+When Fa blocks Emacs to wait for a response from the RPC
 process, it will assume it won't come or wait too long after this
 many seconds. On a slow computer, or if you have a large project,
 you might want to increase this.
@@ -96,18 +96,18 @@ A setting of nil means to block indefinitely."
   :safe (lambda (val)
           (or (integerp val)
               (null val)))
-  :group 'ec)
+  :group 'fa)
 
 (defcustom fa-rpc-error-timeout 30
   "Minimum number of seconds between error popups.
-When Ec encounters an error in the backend, it will display a
+When Fa encounters an error in the backend, it will display a
 lengthy description of the problem for a bug report. This hangs
 Emacs for a moment, and can be rather annoying if it happens
 repeatedly while editing a source file.
-If this variabl is non-nil, Ec will not display the error
+If this variabl is non-nil, Fa will not display the error
 message again within this amount of seconds."
   :type 'integer
-  :group 'ec)
+  :group 'fa)
 
 (defvar fa-rpc--call-id 0
   "Call id of the last call to `fa-rpc`.
@@ -162,33 +162,33 @@ This maps call IDs to functions.")
        ((not (numberp code))
         (error "Bad response from RPC: %S" error-object))
        ((< code 300)
-        (message "Ec warning: %s" message))
+        (message "Fa warning: %s" message))
        ((< code 500)
-        (error "Ec error: %s" message))
+        (error "Fa error: %s" message))
        ((= code -3001)
-        (error "Ec error - Offline?: %s" message))
+        (error "Fa error - Offline?: %s" message))
        ((and fa-rpc-error-timeout
              fa-rpc--last-error-popup
              (<= (float-time)
                  (+ fa-rpc--last-error-popup
                     fa-rpc-error-timeout)))
-        (message "Ec error popup ignored, see `fa-rpc-error-timeout': %s"
+        (message "Fa error popup ignored, see `fa-rpc-error-timeout': %s"
                  message))
        (t
         (let ((config nil))
-          (fa-insert--popup "*Ec Error*"
-            (fa-insert--header "Ec Error")
+          (fa-insert--popup "*Fa Error*"
+            (fa-insert--header "Fa Error")
             (fa-insert--para
              "The backend encountered an unexpected error. This indicates "
-             "a bug in Ec. Please open a bug report with the data below "
-             "in the Ec bug tracker:")
+             "a bug in Fa. Please open a bug report with the data below "
+             "in the Fa bug tracker:")
             (insert "\n"
                     "\n")
             (insert-button
-             "https://github.com/jorgenschaefer/ec/issues/new"
+             "https://github.com/cryptobadger/flight-attendant.el/issues/new"
              'action (lambda (button)
                        (browse-url (button-get button 'url)))
-             'url "https://github.com/jorgenschaefer/ec/issues/new")
+             'url "https://github.com/flight-attendant.el/issues/new")
             (insert "\n"
                     "\n"
                     "```\n")
@@ -353,7 +353,7 @@ This will show a message in the minibuffer that tells the user to
 use \\[fa-config]."
   (let ((msg (if fmt
                  (apply #'format fmt args)
-               "Ec is not properly configured")))
+               "Fa is not properly configured")))
     (error "%s; use M-x fa-config to configure it" msg)))
 
 (defun fa-rpc--open ()
@@ -378,7 +378,7 @@ use \\[fa-config]."
                                       node-cmd fa-copilot-path))
                    (error
                     (fa-config-error
-                     "Ec can't start Python (%s: %s)"
+                     "Fa can't start Python (%s: %s)"
                      (car err) (cadr err)))))
       (set-process-query-on-exit-flag proc nil)
       (set-process-sentinel proc #'fa-rpc--sentinel)
@@ -395,7 +395,7 @@ use \\[fa-config]."
       (buffer-substring (region-beginning) (region-end))))
 
 (defun fa-rpc--disconnect ()
-  "Disconnect rpc process from ec buffers."
+  "Disconnect rpc process from fa buffers."
   (dolist (buf (buffer-list))
     (with-current-buffer buf
       (when fa-mode
@@ -416,7 +416,7 @@ use \\[fa-config]."
 (defun fa-rpc-init (&optional success error)
   "Initialize the backend.
 
-This has to be called as the first method, else Ec won't be
+This has to be called as the first method, else Fa won't be
 able to respond to other calls.
 
 +LIBRARY-ROOT is the current project root,
@@ -485,9 +485,9 @@ RPC calls with the event."
              ;;  (let ((rpc-version (match-string 1)))
              ;;    (replace-match "")
              ;;    (fa-rpc--check-backend-version rpc-version)))
-             ;; ((looking-at ".*No module named ec\n")
+             ;; ((looking-at ".*No module named fa\n")
              ;;  (replace-match "")
-             ;;  (fa-config-error "Ec module not found"))
+             ;;  (fa-config-error "Fa module not found"))
              ((looking-at ".*request cancelled")
               (replace-match "")
               (message "Request Cancelled")
@@ -501,14 +501,14 @@ RPC calls with the event."
 (defun fa-rpc--handle-unexpected-line (line)
   "Handle an unexpected line from the backend.
 This is usually an error or backtrace."
-  (let ((buf (get-buffer "*Ec Output*")))
+  (let ((buf (get-buffer "*Fa Output*")))
     (unless buf
-      (fa-insert--popup "*Ec Output*"
+      (fa-insert--popup "*Fa Output*"
         (fa-insert--header "Output from Backend")
         (fa-insert--para
-         "There was some unexpected output from the Ec backend. "
+         "There was some unexpected output from the Fa backend. "
          "This is usually not a problem and should usually not be "
-         "reported as a bug with Ec. You can safely hide this "
+         "reported as a bug with Fa. You can safely hide this "
          "buffer and ignore it. You can also see the output below "
          "in case there is an actual problem.\n\n")
         (fa-insert--header "Output")
@@ -535,7 +535,7 @@ This is usually an error or backtrace."
 ;;
 
 (defvar fa-promise-marker (make-symbol "*fa-promise*")
-  "An uninterned symbol marking an Ec promise object.")
+  "An uninterned symbol marking an Fa promise object.")
 
 (defun fa-promise (success &optional error)
   "Return a new promise.
@@ -609,7 +609,7 @@ not exist anymore."
 (defun fa-promise-wait (promise &optional timeout)
   "Wait for PROMISE to be resolved, for up to TIMEOUT seconds.
 This will accept process output while waiting.
-This will wait for the current Ec RPC process specifically, as
+This will wait for the current Fa RPC process specifically, as
 Emacs currently has a bug where it can wait for the entire time
 of the timeout, even if output arrives.
 See http://debbugs.gnu.org/cgi/bugreport.cgi?bug=17647"

@@ -29,11 +29,11 @@
 (require 'cl-lib)   ; for `cl-every', `cl-copy-list', `cl-delete-if-not'
 (require 'subr-x)
 (defvar fa-enabled-p nil
-  "Is Ec enabled or not.")
+  "Is Fa enabled or not.")
 (defconst fa-version "0.05.0"
-  "The version of the Ec Lisp code.")
+  "The version of the Fa Lisp code.")
 
-(defgroup ec nil
+(defgroup fa nil
   "Emacs copilot."
   :prefix "fa-"
   :group 'languages)
@@ -44,17 +44,17 @@
 This can be used to enable minor modes for Python development."
   :type 'hook
   :options '(subword-mode hl-line-mode)
-  :group 'ec)
+  :group 'fa)
 
 ;;;###autoload
 (defun fa-enable (&optional _ignored)
-  "Enable Ec in all future Python buffers."
+  "Enable Fa in all future Python buffers."
   (interactive)
   (and fa-enabled-p
-       (message "Ec already enabled."))
+       (message "Fa already enabled."))
   (unless fa-enabled-p
     (when (< emacs-major-version 24)
-      (error "Ec requires Emacs 24 or newer"))
+      (error "Fa requires Emacs 24 or newer"))
     (when _ignored
       (warn "The argument to `fa-enable' is deprecated, customize `fa-modules' instead"))
     (let ((filename (find-lisp-object-file-name 'python-mode
@@ -63,7 +63,7 @@ This can be used to enable minor modes for Python development."
                  (string-match "/python-mode\\.el\\'"
                                filename))
         (error (concat "You are using python-mode.el. "
-                       "Ec only works with python.el from "
+                       "Fa only works with python.el from "
                        "Emacs 24 and above"))))
     ;; (fa-modules-global-init)
     ;; (define-key inferior-python-mode-map (kbd "C-c C-z") 'fa-shell-switch-to-buffer)
@@ -89,7 +89,7 @@ This can be used to enable minor modes for Python development."
 
 
 (defun fa-disable ()
-  "Disable Ec in all future Python buffers."
+  "Disable Fa in all future Python buffers."
   (interactive)
   ;; (fa-modules-global-stop)
   ;; (define-key inferior-python-mode-map (kbd "C-c C-z") nil)
@@ -106,11 +106,11 @@ This can be used to enable minor modes for Python development."
 (define-minor-mode fa-mode
   "Minor mode in Python buffers for the Emacs Lisp Python Environment.
 \\{fa-mode-map}"
-  :lighter " Ec"
+  :lighter " Fa"
   (unless (derived-mode-p 'python-mode)
-    (error "Ec only works with `python-mode'"))
+    (error "Fa only works with `python-mode'"))
   (unless fa-enabled-p
-    (error "Please enable Ec with `(fa-enable)` before using it"))
+    (error "Please enable Fa with `(fa-enable)` before using it"))
   ;; (when (boundp 'xref-backend-functions)
   ;;   (add-hook 'xref-backend-functions #'fa--xref-backend nil t)))
   ;; Set this for `fa-check' command
@@ -188,7 +188,7 @@ This can be used to enable minor modes for Python development."
     (apply module command args)))
 
 (defun fa-modules-global-init ()
-  "Run the global-init method of Ec modules.
+  "Run the global-init method of Fa modules.
 
 Make sure this only happens once."
   (unless fa-modules-initialized-p
@@ -196,7 +196,7 @@ Make sure this only happens once."
     (setq fa-modules-initialized-p t)))
 
 (defun fa-modules-global-stop ()
-  "Run the global-stop method of Ec modules.
+  "Run the global-stop method of Fa modules.
 
 Make sure this only happens once per global-init call."
   (when fa-modules-initialized-p
@@ -204,14 +204,14 @@ Make sure this only happens once per global-init call."
     (setq fa-modules-initialized-p nil)))
 
 (defun fa-modules-buffer-init ()
-  "Run the buffer-init method of Ec modules.
+  "Run the buffer-init method of Fa modules.
 
 Make sure global-init is called first."
   (fa-modules-global-init)
   (fa-modules-run 'buffer-init))
 
 (defun fa-modules-buffer-stop ()
-  "Run the buffer-stop method of Ec modules."
+  "Run the buffer-stop method of Fa modules."
   (fa-modules-run 'buffer-stop))
 
 
