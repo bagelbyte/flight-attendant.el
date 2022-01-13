@@ -136,28 +136,29 @@ This can be used to enable minor modes for Python development."
   (add-hook 'post-self-insert-hook 'fa--on-insert))
 
 (defun fa--enter-insert ()
-  (fa-clear-overlay)
-  (message "inserting")
-  (fa-rpc-request-completion
-   (lambda (completion)
-     (let ((display-text (cdr (assq 'displayText (car (cdr (assq 'completions completion))))))
-           (pos-line (cdr (car (cdr (assq 'position (car (cdr (assq 'completions completion))))))))
-           (pos-char (cdr (assq 'character (cdr (assq 'position (car (cdr (assq 'completions completion)))))))))
-       (and
-        (message display-text)
-        (fa-display-overlay-str display-text pos-line pos-char))))))
+  (when fa-mode
+    (fa-clear-overlay)
+    (fa-rpc-request-completion
+     (lambda (completion)
+       (message (cdr (assq 'displayText (car (cdr (assq 'completions completion))))))
+       (let ((display-text (cdr (assq 'displayText (car (cdr (assq 'completions completion))))))
+             (pos-line (cdr (car (cdr (assq 'position (car (cdr (assq 'completions completion))))))))
+             (pos-char (cdr (assq 'character (cdr (assq 'position (car (cdr (assq 'completions completion)))))))))
+         (and
+          (message display-text)
+          (fa-display-overlay-str display-text pos-line pos-char)))))))
 
 (defun fa--on-insert ()
   (when fa-mode
     (fa-clear-overlay)
-    (fa-rpc-request-completion)
-    (lambda (completion))
-    (let ((display-text (cdr (assq 'displayText (car (cdr (assq 'completions completion)))))
-                        (pos-line (cdr (car (cdr (assq 'position (car (cdr (assq 'completions completion))))))))
-                        (pos-char (cdr (assq 'character (cdr (assq 'position (car (cdr (assq 'completions completion)))))))))))
-    (and
-     (message display-text)
-     (fa-display-overlay-str display-text pos-line pos-char))))
+    (fa-rpc-request-completion
+     (lambda (completion)
+       (let ((display-text (cdr (assq 'displayText (car (cdr (assq 'completions completion))))))
+             (pos-line (cdr (car (cdr (assq 'position (car (cdr (assq 'completions completion))))))))
+             (pos-char (cdr (assq 'character (cdr (assq 'position (car (cdr (assq 'completions completion)))))))))
+         (and
+          (message display-text)
+          (fa-display-overlay-str display-text pos-line pos-char)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Module: Sane Defaults
