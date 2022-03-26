@@ -1,13 +1,13 @@
 ;;; flight-attendant-rpc.el --- Minor mode to provide Github Copilot support -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2021
-;; Author: cryptobadger <https://github.com/cryptobadger>
-;; Maintainer: cryptobadger
+;; Author: fkr <https://github.com/fkr-0>
+;; Maintainer: fkr_0
 ;; Created: December 02, 2021
 ;; Modified: December 02, 2021
 ;; Version: 0.0.1
 ;; Keywords: abbrev bib c calendar comm convenience data docs emulations extensions faces files frames games hardware help hypermedia i18n internal languages lisp local maint mail matching mouse multimedia news outlines processes terminals tex tools unix vc wp
-;; Homepage: https://github.com/cryptobadger/flight-attendant.el
+;; Homepage: https://github.com/fkr_0/flight-attendant.el
 ;; Package-Requires: ((emacs "24.3"))
 ;;
 ;; This file is not part of GNU Emacs.
@@ -22,21 +22,21 @@
 
 (require 'json)
 
-(message "flight-attendant-rpc.el loaded")
 
-(defvar fa-libroot (file-name-directory (or load-file-name buffer-file-name))
-  "Probably only interim. do not really know why this is here.")
 (defvar gh-token nil)
 (defvar gh-ratelimit-remaining nil)
 (defvar gh-ratelimit-reset nil)
 (defvar gh-token-expires nil)
-(defcustom fa-copilot-path (concat fa-libroot "copilot/dist/agent.js")
+(defcustom fa-copilot-path nil
   "The full path to the copilot executable 'agent.js'."
-  :group 'fa)
+  :group 'fa
+  :type 'string)
 
 (defcustom fa-oauth-token (cdr (caddar (json-read-file "~/.config/github-copilot/hosts.json")))
   "The github oauth token. Usually found in ~/.config/github-copilot/hosts.json."
+  :type 'string
   :group 'fa)
+
 (defcustom fa-rpc-maximum-buffer-age (* 5 60)
   "Seconds after which Fa automatically closes an unused RPC buffer.
 Fa creates RPC buffers over time, depending on python interpreters
@@ -82,6 +82,7 @@ for example), set this to the full interpreter path."
          (when (and (fboundp 'fa-rpc-restart)
                     (not (autoloadp #'fa-rpc-restart)))
            (fa-rpc-restart)))
+  :type 'string
   :group 'fa)
 
 
@@ -122,10 +123,6 @@ Used to associate responses to callbacks.")
 (defvar fa-rpc--buffer nil
   "The fa-rpc buffer associated with this buffer.")
 (make-variable-buffer-local 'fa-rpc--buffer)
-
-(defvar fa-rpc--backend-library-root nil
-  "The project root used by this backend.")
-(make-variable-buffer-local 'fa-rpc--backend-library-root)
 
 (defvar fa-rpc--backend-callbacks nil
   "The callbacks registered for calls to the current backend.
@@ -186,7 +183,7 @@ This maps call IDs to functions.")
             (insert "\n"
                     "\n")
             (insert-button
-             "https://github.com/cryptobadger/flight-attendant.el/issues/new"
+             "https://github.com/fkr_0/flight-attendant.el/issues/new"
              'action (lambda (button)
                        (browse-url (button-get button 'url)))
              'url "https://github.com/flight-attendant.el/issues/new")
@@ -361,8 +358,8 @@ use \\[fa-config]."
   "Start a new RPC process and return the associated buffer."
   (fa-rpc--cleanup-buffers)
   (let* ((node-cmd (executable-find fa-rpc-node-command))
-         (name (format " *fa-rpc [project:%s]*"
-                       fa-libroot))
+         (name (format " *fa-rpc [mode:%s]*"
+                       major-mode))
          (new-fa-rpc-buffer (generate-new-buffer name))
          (proc nil))
     (unless node-cmd
@@ -370,7 +367,6 @@ use \\[fa-config]."
     (with-current-buffer new-fa-rpc-buffer
       (setq fa-rpc--buffer-p t
             fa-rpc--buffer (current-buffer)
-            fa-rpc--backend-library-root fa-libroot
             default-directory "/"
             proc (condition-case err
                      (let ((process-connection-type nil))
@@ -385,8 +381,8 @@ use \\[fa-config]."
       (set-process-sentinel proc #'fa-rpc--sentinel)
       (set-process-filter proc #'fa-rpc--filter)
       (fa-rpc-init))
-      ;;  (lambda (result)
-      ;;    (message (cdr (assq 'version result))))))
+    ;;  (lambda (result)
+    ;;    (message (cdr (assq 'version result))))))
     new-fa-rpc-buffer))
 
 
@@ -419,15 +415,13 @@ use \\[fa-config]."
 
 This has to be called as the first method, else Fa won't be
 able to respond to other calls.
-
-+LIBRARY-ROOT is the current project root,
-+ENVIRONMENT-BINARIES is the path to the python binaries of the environment to work in."
+"
   (message "Starting copilot")
   (message (concat "Github Copilot started - " (cdr (assq 'version
-                                                        (fa-rpc "getVersion"
-                                                    ;; This uses a vector because otherwise, json-encode in
-                                                    ;; older Emacsen gets seriously confused, especially when
-                                                    ;; backend is nil.
+                                                          (fa-rpc "getVersion"
+                                                                  ;; This uses a vector because otherwise, json-encode in
+                                                                  ;; older Emacsen gets seriously confused, especially when
+                                                                  ;; backend is nil.
                                                                   (make-hash-table))))))
   (fa-rpc-get-token))
 '((version . 1.7.4))
@@ -632,22 +626,23 @@ See http://debbugs.gnu.org/cgi/bugreport.cgi?bug=17647"
 
 Not async because we have no id to keep track of the promise"
   (let ((result (fa-rpc "httpRequest"
-                       `((:headers
-                          (:Authorization . ,(concat "Bearer " fa-oauth-token)))
-                         (:url . "https://api.github.com/copilot_internal/token")
-                         (:timeout . 30000)))))
-      (setq gh-token (cdr (assq 'token (json-read-from-string (cdr (assq 'body result))))))
-      (setq gh-ratelimit-remaining (cdr (assq 'x-ratelimit-remaining (assq 'headers result))))
-      (setq gh-ratelimit-reset (cdr (assq 'x-ratelimit-reset (assq 'headers result))))
-      (setq gh-token-expires (cdr (assq 'expires_at (json-read-from-string (cdr (assq 'body result))))))))
+                        `((:headers
+                           (:Authorization . ,(concat "Bearer " fa-oauth-token)))
+                          (:url . "https://api.github.com/copilot_internal/token")
+                          (:timeout . 30000)))))
+    (setq gh-token (cdr (assq 'token (json-read-from-string (cdr (assq 'body result))))))
+    (setq gh-ratelimit-remaining (cdr (assq 'x-ratelimit-remaining (assq 'headers result))))
+    (setq gh-ratelimit-reset (cdr (assq 'x-ratelimit-reset (assq 'headers result))))
+    (setq gh-token-expires (cdr (assq 'expires_at (json-read-from-string (cdr (assq 'body result))))))))
 
 (defun fa--get-path ()
-    (or buffer-file-name
-        (ignore-errors
-          (buffer-file-name
-           (buffer-base-buffer)))))
+  (or buffer-file-name
+      (ignore-errors
+        (buffer-file-name
+         (buffer-base-buffer)))))
+
 (defun fa--get-relative-path ()
-    (file-name-nondirectory buffer-file-name))
+  (file-name-nondirectory buffer-file-name))
 
 (defun fa--get-buffer-str ()
   (let ((pos))
@@ -668,9 +663,7 @@ Not async because we have no id to keep track of the promise"
   tab-width)
 (defun fa--get-insert-spaces ()
   t)
-(defvar language-ids '((python-mode . "python")
-                       ;; (emacs-lisp-mode . "python")
-                       (typescript-mode . "typescript")))
+
 (defun fa--get-language-id ()
   (cdr (assq major-mode language-ids)))
 

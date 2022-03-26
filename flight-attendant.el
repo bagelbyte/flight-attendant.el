@@ -2,8 +2,8 @@
 ;;
 ;; Copyright (C) 2021
 ;;
-;; Author: cryptobadger <https://github.com/cryptobadger>
-;; Maintainer: cryptobadger
+;; Author: fkr <https://github.com/fkr-0>
+;; Maintainer: fkr_0
 ;; Created: November 28, 2021
 ;; Modified: November 28, 2021
 ;; Version: 0.0.1
@@ -20,10 +20,7 @@
 ;;; Code:
 ;;;
 
-(add-to-list 'load-path ".")
-(message "flight-attendant.el loaded")
 (require 'json)
-;; (add-load-path! ".")
 (require 'flight-attendant-rpc)
 (require 'flight-attendant-ui)
 (require 'cl-lib)   ; for `cl-every', `cl-copy-list', `cl-delete-if-not'
@@ -33,41 +30,59 @@
 (defconst fa-version "0.05.0"
   "The version of the Fa Lisp code.")
 
+
+(defcustom language-ids
+  '((python-mode . "python")
+    (emacs-lisp-mode . "emacs-lisp")
+    (sh-mode . "sh"))
+  ;; (markdown . "markdown")
+  ;; (typescript-mode . "typescript")
+  ;; (org-mode . "org-mode")
+  ;; (javascript-mode . "javascript")
+  ;; (rjsx-mode . "javascript")
+  ;; (gfm-mode . "markdown")
+  ;; (rustic-mode . "rust"))
+  "Languages for which Copilot should request completion. For an overview of possible modes refer to 'auto-mode-alist'."
+  :type 'list
+  :group 'fa)
+
+
 (defgroup fa nil
   "Emacs copilot."
   :prefix "fa-"
   :group 'languages)
 
+(defcustom fa-modules '()
+  "TODO - additional modifications."
+  :type 'list
+  :group 'fa)
+
 (defcustom fa-mode-hook nil
   "Hook run when `fa-mode' is enabled.
-
-This can be used to enable minor modes for Python development."
+This can be used to enable minor modes when flight-attendant is used. E.g. to disable plugins messing with the visuals."
   :type 'hook
   :options '(subword-mode hl-line-mode)
   :group 'fa)
 
 ;;;###autoload
-(defun fa-enable (&optional _ignored)
-  "Enable Fa in all future Python buffers."
+(defun flight-attendant (&optional _ignored)
+  "Toggle flight attendant."
+  (interactive)
+  (if fa-enabled-p
+      (fa-disable)
+    (fa-enable)))
+
+(defun fa-enable (&optional)
+  "Enable Fa for all defined languages."
   (interactive)
   (and fa-enabled-p
-       (message "Fa already enabled."))
+       (message "Fa already enabled.")
+       (when (not (assq major-mode language-ids))
+         (warn (concat "The current major mode is not"
+                       "listed in 'language-ids'."))))
   (unless fa-enabled-p
-    (when (< emacs-major-version 24)
-      (error "Fa requires Emacs 24 or newer"))
-    (when _ignored
-      (warn "The argument to `fa-enable' is deprecated, customize `fa-modules' instead"))
-    (let ((filename (find-lisp-object-file-name 'python-mode
-                                                'symbol-function)))
-      (when (and filename
-                 (string-match "/python-mode\\.el\\'"
-                               filename))
-        (error (concat "You are using python-mode.el. "
-                       "Fa only works with python.el from "
-                       "Emacs 24 and above"))))
-    ;; (fa-modules-global-init)
-    ;; (define-key inferior-python-mode-map (kbd "C-c C-z") 'fa-shell-switch-to-buffer)
-    (add-hook 'python-mode-hook 'fa-mode)
+    (fa-modules-global-init)
+    ;; (add-hook 'python-mode-hook 'fa-mode)
     ;; (add-hook 'pyvenv-post-activate-hooks 'fa-rpc--disconnect)
     ;; (add-hook 'pyvenv-post-deactivate-hooks 'fa-rpc--disconnect)
     ;; (add-hook 'inferior-python-mode-hook 'fa-shell--enable-output-filter)
@@ -78,20 +93,18 @@ This can be used to enable minor modes for Python development."
     ;;  `((,(replace-regexp-in-string "\\\\" "\\\\"
     ;;                                fa-shell-cell-boundary-regexp)
     ;;     0 'fa-codecell-boundary prepend)))
-    ;; ;; Enable Fa-mode in the opened python buffer
+    ;; ;; Enable Fa-mode in the opened buffer
     (setq fa-enabled-p t)
     (dolist (buffer (buffer-list))
       (and (not (string-match "^ ?\\*" (buffer-name buffer)))
            (with-current-buffer buffer
-             (when (string= major-mode 'python-mode)
-               (python-mode)  ;; update codecell fontification
+             (when (assq major-mode language-ids)
                (fa-mode t)))))))
 
-
 (defun fa-disable ()
-  "Disable Fa in all future Python buffers."
+  "Disable Fa."
   (interactive)
-  ;; (fa-modules-global-stop)
+  (fa-modules-global-stop)
   ;; (define-key inferior-python-mode-map (kbd "C-c C-z") nil)
   ;; (remove-hook 'python-mode-hook 'fa-mode)
   ;; Remove codecell boundaries highligting
@@ -103,14 +116,15 @@ This can be used to enable minor modes for Python development."
   (remove-hook 'evil-insert-state-entry-hook 'fa--enter-insert)
   (remove-hook 'evil-insert-state-exit-hook 'fa-clear-overlay)
   (remove-hook 'post-self-insert-hook 'fa--on-insert))
+
 (define-minor-mode fa-mode
-  "Minor mode in Python buffers for the Emacs Lisp Python Environment.
+  "Minor mode for requesting auto-completion suggestions provided by GitHub Copilot.
 \\{fa-mode-map}"
   :lighter " Fa"
-  (unless (derived-mode-p 'python-mode)
-    (error "Fa only works with `python-mode'"))
+  (unless (assq major-mode language-ids)
+    (warn "flight-attendant.el is not enabled for this major mode."))
   (unless fa-enabled-p
-    (error "Please enable Fa with `(fa-enable)` before using it"))
+    (error "Please enable flight-attendant with 'flight-attendant' before using it"))
   ;; (when (boundp 'xref-backend-functions)
   ;;   (add-hook 'xref-backend-functions #'fa--xref-backend nil t)))
   ;; Set this for `fa-check' command
@@ -127,7 +141,9 @@ This can be used to enable minor modes for Python development."
       (fa-rpc-get-token)))
    ((not fa-mode)
     ;; disable
-    (fa--remove-hooks))))
+    (fa--remove-hooks)
+    (delete 'mode-line-misc-info
+            `(fa-mode (" [COPILOT] "))))))
 ;; (fa-modules-buffer-stop)))
 
 (defun fa--add-hooks ()
@@ -163,19 +179,16 @@ This can be used to enable minor modes for Python development."
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Module: Sane Defaults
 
-(defun fa-module-sane-defaults (command &rest _args)
-  "Module for sane Emacs default for python."
+(defun fa-module-fix-company (command &rest _args)
+  "TODO Make overlays work with company"
   (pcase command
     (`buffer-init
      ;; Set `forward-sexp-function' to nil in python-mode. See
      ;; http://debbugs.gnu.org/db/13/13642.html
-     (set (make-local-variable 'forward-sexp-function) nil)
-     ;; PEP8 recommends two spaces in front of inline comments.
-     (set (make-local-variable 'comment-inline-offset) 2))
-    (`buffer-stop
-     (kill-local-variable 'forward-sexp-function)
-     (kill-local-variable 'comment-inline-offset))))
 
+     (when (and (variable-at-point 'company-mode-on) (company-mode-on)
+                (variable-at-point 'company-box-mode) (not company-box-mode)
+            (warn "Company without childframes will mess up the display."))))))
 
 ;;;;;;;;;;;
 ;;; Modules

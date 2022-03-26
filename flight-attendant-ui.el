@@ -2,13 +2,13 @@
 ;;
 ;; Copyright (C) 2021
 ;;
-;; Author: cryptobadger <https://github.com/cryptobadger>
-;; Maintainer: cryptobadger
+;; Author: fkr <https://github.com/fkr-0>
+;; Maintainer: also me
 ;; Created: December 02, 2021
 ;; Modified: December 02, 2021
 ;; Version: 0.0.1
 ;; Keywords: abbrev bib c calendar comm convenience data docs emulations extensions faces files frames games hardware help hypermedia i18n internal languages lisp local maint mail matching mouse multimedia news outlines processes terminals tex tools unix vc wp
-;; Homepage: https://github.com/cryptobadger/flight-attendant.el
+;; Homepage: https://github.com/fkr_0/flight-attendant.el
 ;; Package-Requires: ((emacs "24.3"))
 ;;
 ;; This file is not part of GNU Emacs.
@@ -20,7 +20,6 @@
 ;;; Code:
 
 
-(message "flight-attendant-ui.el loaded")
 (defface fa-overlay-face
   '((t :inherit shadow))
   "The face used for code lens overlays."

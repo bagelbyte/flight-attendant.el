@@ -1,7 +1,7 @@
 #+TITLE: flight-attendant.el - unofficial Emacs Copilot integration
 
 This is a quite unsophisticated attempt to get [[https://copilot.github.com/][GitHub Copilot]] up and running in Emacs.
-  [[https://github.com/cryptobadger/flight-attendant.el/blob/media/pics/example-out.png?raw=true]]
+  [[https://github.com/fkr-0/flight-attendant.el/blob/media/pics/example-out.png?raw=true]]
 
 What i did:
 
@@ -25,22 +25,34 @@ You need to have access to the github Copilot program. Since i did not yet imple
 1. clone this project
 2. clone https://github.com/github/copilot.vim and copy the ~copilot~ directory to the ~flight-attendant.el~ project folder
 3. run
+   - using use-package
+   #+begin_src sh
+git clone git@github.com:fkr-0/flight-attendant.el.git
+   #+end_src
+
    #+begin_src emacs-lisp
-(add-to-list 'load-path "/path/to/repo/")
-(load "flight-attendant.el")
-(fa-enable)
+(use-package flight-attendant
+  :config (setq fa-copilot-path (expand-file-name "~/path/to/nvim/agent.js")
+                fa-oauth-token (expand-file-name "~/path/to/github-copilot/hosts.json"))
+  :load-path "~/code/flight-attendant.el/")
    #+end_src
-For friends of copy + paste:
-   #+begin_src bash
-git clone https://github.com/cryptobadger/flight-attendant.el;
-git clone https://github.com/github/copilot.vim;
-cp -r copilot.vim/copilot flight-attendant.el/;
-emacs --eval "(progn (add-to-list 'load-path \"flight-attendant.el/\") (load \"flight-attendant.el\") (fa-enable))"
+   - using [[https://github.com/hlissner/doom-emacs][doom]] emacs
+     - ~package.el~
+   #+begin_src emacs-lisp
+;; for devs
+(package! flight-attendant
+  :recipe (:local-repo "~/local/clone/of/flight-attendant.el/"
+           :build (:not compile)))
+;; else
+(package! flight-attendant :recipe (:host github :repo "fkr-0/flight-attendant.el"))
    #+end_src
-** Display Completions
-Below is the problem:
-  [[https://github.com/cryptobadger/flight-attendant.el/blob/media/pics/company-bug.png?raw=true]]
-Any ideas how to display the completion candidate(s?) properly is welcome.
+     - ~config.el~
+   #+begin_src emacs-lisp
+(use-package! flight-attendant
+  :config (setq fa-copilot-path (expand-file-name "~/path/to/nvim/agent.js")
+                fa-oauth-token (expand-file-name "~/.config/github-copilot/hosts.json")))
+   #+end_src
+
 ** Roadmap/Todo
 Sorted by urgency.
 - [ ] fix/find a solution for the question how to display hints
